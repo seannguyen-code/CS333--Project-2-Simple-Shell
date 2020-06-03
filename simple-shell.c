@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -21,12 +23,18 @@ int ampersand = 0;
 int parse_cmd(char* cmd, char** params);
 int prompt_cmd(char* cmd);
 int execute_cmd(char **params);
+int do_command(char **args, int block, int input, char *input_file, int output, char *output_file);
+int redirected_input(char **args, char **input_file);
+int redirected_output(char **args, char **output_file)
 
 int main(void) {
 	char command[MAX_LENGTH];
 	char *args[MAX_LENGTH_PARAMS]; 
 	int should_run = 1;
-	
+	int input;
+	int output;
+	char *output_file;
+	char *input_file;
 
 	while (should_run) {
 		if (!prompt_cmd(command)) break;  //Prompt type
@@ -38,27 +46,41 @@ int main(void) {
 			ampersand = 1;
 			args[--argc] = NULL;
 		}
+		
+		// Check for redirected output
+		output = redirected_output(args, &output_file);
+		switch(output)
+		{
+			case -1:
+				printf("Syntax error! \n");
+				continue;
+				break;
+			case 0:
+				break;
+			case 1:
+				printf("Redirecting output to: %s \n", output_file );
+				break;
+		}
 
-		//If command contains output redirection argument
-		//	fork a child process invoking fork() system call and perform the followings in the child process:
-		//		open the redirected file in write only mode invoking open() system call
-		//		copy the opened file descriptor to standard output file descriptor (STDOUT_FILENO) invoking dup2() system call
-		//		close the opened file descriptor invoking close() system call
-		//		change the process image with the new process image according to the UNIX command using execvp() system call
-		//	If command does not conatain & (ampersand) at the end
-		//		invoke wait() system call in parent process.
-		//
-		//		
-		//If command contains input redirection argument
-		//	fork a child process invoking fork() system call and perform the followings in the child process:
-		//		open the redirected file in read  only mode invoking open() system call
-		//		copy the opened file descriptor to standard input file descriptor (STDIN_FILENO) invoking dup2() system call
-		//		close the opened file descriptor invoking close() system call
-		//		change the process image with the new process image according to the UNIX command using execvp() system call
-		//	If command does not conatain & (ampersand) at the end
-		//		invoke wait() system call in parent process.
-		//
-		//	
+		// Check for redirected input
+		input = redirected_input(args, &input_file);
+		switch(input)
+		{
+			case -1:
+				printf("Syntax error!\n");
+				continue;
+				break;
+			case 0:
+				break;
+			case 1:
+				printf("Redirecting input from :%s\n", input_file );
+				break;
+		}
+
+		// Do the command
+		do_command(agrs, input, input_file, output, output_file);
+
+		
 		
 		//If command contains pipe argument
 		//	fork a child process invoking fork() system call and perform the followings in the child process:
@@ -133,3 +155,93 @@ int execute_cmd(char **params) {
 	}
 }
 
+// Do the command
+int do_command(char **args, int input, char *input_file, int output, char *output_file)
+{
+	int result;
+	pid_t child_id;
+	int status;
+
+	child_id = fork();  //Fork the child process
+
+	if(child_id < 0)   //Check for the errors in fork()
+	{
+		case EAGAIN:
+			perror("Error EAGAIN: ");
+			return 0;
+		case ENOMEM:
+			perror("Error ENOMEM: ");
+			return 0;
+	}
+	else if(child_id == 0)
+	{
+		// Set up redirection in the child process
+		if (input)    
+		{
+			int fd0 = open(input_file, O_RDONLY);
+			dup2(fd0, STDIN_FILENO);
+			close(fd0);
+		}
+		if (output)
+		{
+			int fd1 = open(output_file, 0644);
+			dup2(fd1, STDOUT_FILENO);
+			close(fd1);
+		}
+		//Execute the command
+		result = execvp(args[0], args);
+
+		exit(-1);
+	}
+	else
+	{
+		waitpid(child_id, 0, 0);
+    		free(args);
+	}
+}
+
+// Check input redirection
+int redirected_input(char **args, char **input_file)
+{
+	for(int i = 0; args[i] != NULL; ++i)
+	{
+		if(args[i][0] == '<')
+		{
+			free(args[i]);
+			if(args[i+1] != NULL)
+			{
+				*input_file = args[i+1];
+			}
+			else
+				return -1;
+		}
+		//Adjust the rest of the arguments in the array
+		for(int j = i; args[j-1] != NULL, j++)
+			args[j] = args[j+2];
+		return 1;
+	}
+	return 0;
+}
+
+// Check for output redirection
+int redirected_output(char **args, char **output_file)
+{
+	for(int i = 0; args[i] != NULL; i++)
+	{
+		if(args[i][0] == '>')
+		{
+			free(args[i]);
+			if(args[i+1] != NULL)
+			{
+				*output_file = args[i+1];
+			}
+			else
+				return -1;
+		}
+		//Adjust the rest of the arguments in the array
+		for(int j = i; args[j-1] != NULL; j++)
+			args[j] = args[j+2];
+		return 1;
+	}
+	return 0;
+}
