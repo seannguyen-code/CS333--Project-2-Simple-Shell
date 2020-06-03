@@ -17,7 +17,7 @@
 #define MAX_LENGTH_PARAMS 41 // The maximum length of the args
 #define MAX_HISTORY 10
 
-int ampersand = 0;
+
 int parse_cmd(char* cmd, char** params);
 int prompt_cmd(char* cmd);
 int execute_cmd(char **params);
@@ -27,16 +27,17 @@ int main(void) {
 	char *args[MAX_LENGTH_PARAMS]; 
 	int should_run = 1;
 	
+	int ampersand = 0;
 
 	while (should_run) {
 		if (!prompt_cmd(command)) break;  //Prompt type
 
-		int argc = parse_cmd(command, args); //Parse command and arguments.
+		int argc = parse_cmd(command, args); //Parse command and arguments	
 		if (strcmp(args[0], "exit") == 0) break;
 
 		if (strcmp(args[argc-1], "&") == 0) { //check ampersand
 			ampersand = 1;
-			args[--argc] = NULL;
+			args[--argc] = NULL; //remove ampersand
 		}
 
 		//If command contains output redirection argument
