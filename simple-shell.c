@@ -19,35 +19,32 @@
 #define MAX_LENGTH_PARAMS 41 // The maximum length of the args
 #define MAX_HISTORY 10
 
-
+int ampersand = 0;
 int parse_cmd(char* cmd, char** params);
 int prompt_cmd(char* cmd);
 int execute_cmd(char **params);
-int do_command(char **args, int block, int input, char *input_file, int output, char *output_file);
+int do_command(char **args, int input, char *input_file, int output, char *output_file);
 int redirected_input(char **args, char **input_file);
-int redirected_output(char **args, char **output_file)
+int redirected_output(char **args, char **output_file);
 
 int main(void) {
 	char command[MAX_LENGTH];
 	char *args[MAX_LENGTH_PARAMS]; 
 	int should_run = 1;
-	
-	int ampersand = 0;
 	int input;
 	int output;
 	char *output_file;
 	char *input_file;
 
-
 	while (should_run) {
 		if (!prompt_cmd(command)) break;  //Prompt type
 
-		int argc = parse_cmd(command, args); //Parse command and arguments	
+		int argc = parse_cmd(command, args); //Parse command and arguments.
 		if (strcmp(args[0], "exit") == 0) break;
 
 		if (strcmp(args[argc-1], "&") == 0) { //check ampersand
 			ampersand = 1;
-			args[--argc] = NULL; //remove ampersand
+			args[--argc] = NULL;
 		}
 		
 		// Check for redirected output
@@ -81,7 +78,7 @@ int main(void) {
 		}
 
 		// Do the command
-		do_command(agrs, input, input_file, output, output_file);
+		do_command(args, input, input_file, output, output_file);
 
 		
 		
@@ -97,12 +94,18 @@ int main(void) {
 		//		change the process image with the new process image according to the first UNIX command before the pipe symbol (|) using execvp() system call
 		//	If command does not conatain & (ampersand) at the end
 		//		invoke wait() system call in parent process.
-		
+		//
+		//
+		//If command does not contain any of the above
+		//	fork a child process using fork() system call and perform the followings in the child process.
+		//		change the process image with the new process image according to the UNIX command using execvp() system call
+		//	If command does not conatain & (ampersand) at the end
+		//		invoke wait() system call in parent process.
 		if (execute_cmd(args) == 0) break;
 	}
 
 	return 0;
-}
+};
 
 int prompt_cmd(char* cmd) {
 	static int first_time = 1;
@@ -118,7 +121,7 @@ int prompt_cmd(char* cmd) {
 	if(cmd[strlen(cmd)-1] == '\n')  
 		cmd[strlen(cmd)-1] = '\0'; //remove newline char    
 	return 1;
-}
+};
 
 int parse_cmd(char* cmd, char** params) {
 	int i,n=-1;
@@ -163,12 +166,7 @@ int do_command(char **args, int input, char *input_file, int output, char *outpu
 
 	if(child_id < 0)   //Check for the errors in fork()
 	{
-		case EAGAIN:
-			perror("Error EAGAIN: ");
-			return 0;
-		case ENOMEM:
-			perror("Error ENOMEM: ");
-			return 0;
+		perror("fork");
 	}
 	else if(child_id == 0)
 	{
@@ -195,7 +193,7 @@ int do_command(char **args, int input, char *input_file, int output, char *outpu
 		waitpid(child_id, 0, 0);
     		free(args);
 	}
-}
+};
 
 // Check input redirection
 int redirected_input(char **args, char **input_file)
@@ -213,12 +211,12 @@ int redirected_input(char **args, char **input_file)
 				return -1;
 		}
 		//Adjust the rest of the arguments in the array
-		for(int j = i; args[j-1] != NULL, j++)
+		for(int j = i; args[j-1] != NULL; j++)
 			args[j] = args[j+2];
 		return 1;
 	}
 	return 0;
-}
+};
 
 // Check for output redirection
 int redirected_output(char **args, char **output_file)
@@ -241,4 +239,4 @@ int redirected_output(char **args, char **output_file)
 		return 1;
 	}
 	return 0;
-}
+};
